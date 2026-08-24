@@ -1,0 +1,27 @@
+server:
+  port: 7070
+
+spring:
+  application:
+    name: chat-service
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+    consumer:
+      group-id: chat-consumer-group-v2  # Use a fresh group ID to bypass poisoned old records
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer  # <-- Fixed: concrete class
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        # 2. Instruct the Error Handler to delegate work to the JsonDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+
+app:
+  kafka:
+    topic:
+      chat: live-chat-events
