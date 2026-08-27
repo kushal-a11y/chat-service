@@ -3,70 +3,1005 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Chat Stream Viewer</title>
-    <!-- Include SockJS and STOMP libraries -->
+    <title>Live Stream Chat - Streamline</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
-        .controls { margin-bottom: 20px; display: flex; gap: 10px; }
-        input { padding: 10px; flex-grow: 1; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
-        #chat-box { border: 1px solid #ddd; height: 400px; overflow-y: auto; padding: 15px; background-color: #f9f9f9; border-radius: 4px; }
-        .chat-message { margin-bottom: 10px; padding: 8px; background: white; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .sender { font-weight: bold; color: #d9534f; margin-right: 5px; }
+        :root {
+            --gradient-primary: linear-gradient(135deg, #9b5cff 0%, #7538dc 100%);
+            --gradient-accent: linear-gradient(135deg, #38d9d0 0%, #1ea8b8 100%);
+            --gradient-warm: linear-gradient(135deg, #e8b635 0%, #d49a1f 100%);
+            --color-bg-dark: #0a0a0d;
+            --color-bg-panel: #111116;
+            --color-bg-soft: #17171e;
+            --color-fg: #f4f3f7;
+            --color-fg-muted: #b1aebb;
+            --color-fg-dim: #858493;
+            --color-accent-cyan: #38d9d0;
+            --color-accent-violet: #9b5cff;
+            --color-accent-gold: #e8b635;
+            --color-accent-green: #63f28c;
+            --color-accent-red: #ff5d69;
+            --color-border: #292932;
+            --radius-sm: 0.5rem;
+            --radius-md: 0.75rem;
+            --radius-lg: 1.125rem;
+        }
+
+        * { box-sizing: border-box; }
+
+        html {
+            background: var(--color-bg-dark);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--color-bg-dark);
+            color: var(--color-fg);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        button, input, textarea {
+            font: inherit;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+
+        button:disabled, input:disabled, textarea:disabled {
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: var(--color-bg-panel);
+            position: relative;
+        }
+
+        /* ===== JOIN ROOM MODAL ===== */
+        .join-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            background: rgba(5, 5, 9, 0.82);
+            backdrop-filter: blur(18px);
+        }
+        .join-overlay.is-hidden { display: none; }
+        .join-card {
+            width: min(100%, 440px);
+            padding: 2rem;
+            border: 1px solid rgba(155, 92, 255, 0.35);
+            border-radius: 1.5rem;
+            background: linear-gradient(145deg, #19151f 0%, #0e0e13 70%);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65), 0 0 70px rgba(117, 56, 220, 0.18);
+        }
+        .join-mark { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: var(--gradient-primary); font-size: 1.3rem; box-shadow: 0 10px 24px rgba(155, 92, 255, 0.3); }
+        .join-card h2 { margin: 1.5rem 0 0.5rem; font-size: clamp(1.75rem, 5vw, 2.3rem); letter-spacing: -0.05em; }
+        .join-card p { margin: 0 0 1.5rem; color: var(--color-fg-muted); line-height: 1.6; }
+        .join-form { display: grid; gap: 1rem; }
+        .join-form label { display: grid; gap: 0.45rem; color: var(--color-fg-muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+        .join-form input { width: 100%; height: 48px; padding: 0 0.9rem; color: var(--color-fg); background: #0a0a0e; border: 1px solid #34343e; border-radius: 0.8rem; outline: none; }
+        .join-form input:focus { border-color: var(--color-accent-violet); box-shadow: 0 0 0 4px rgba(155, 92, 255, 0.14); }
+        .join-submit { height: 48px; margin-top: 0.35rem; border-radius: 0.8rem; color: white; background: var(--gradient-primary); font-weight: 800; box-shadow: 0 10px 24px rgba(117, 56, 220, 0.28); }
+        .join-submit:hover { filter: brightness(1.08); transform: translateY(-1px); }
+        .join-error { min-height: 1.2rem; color: #ff8c96; font-size: 0.82rem; }
+
+        /* ===== HEADER ===== */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--color-border);
+            background: linear-gradient(180deg, #0d0d11 0%, #0a0a0d 100%);
+            min-height: 64px;
+        }
+
+        .header-branding {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .header-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--gradient-primary);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.8rem;
+            background: rgba(255, 93, 105, 0.12);
+            border-radius: var(--radius-md);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            color: var(--color-fg-muted);
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--color-accent-red);
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 93, 105, 0.7); }
+            50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(255, 93, 105, 0); }
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-btn {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: var(--color-fg-muted);
+            border-radius: var(--radius-md);
+            transition: all 0.2s ease;
+        }
+
+        .header-btn:hover {
+            background: rgba(155, 92, 255, 0.1);
+            color: var(--color-accent-violet);
+        }
+
+        /* ===== CONTROLS SECTION ===== */
+        .controls-section {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--color-border);
+            background: linear-gradient(180deg, #0f0f14 0%, #0a0a0d 100%);
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            flex: 1;
+            min-width: 140px;
+        }
+
+        .input-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--color-fg-dim);
+        }
+
+        .input-field {
+            width: 100%;
+            height: 40px;
+            padding: 0 12px;
+            background: #0f0f14;
+            border: 1px solid #34343e;
+            border-radius: var(--radius-md);
+            color: var(--color-fg);
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .input-field:focus {
+            border-color: var(--color-accent-violet);
+            box-shadow: 0 0 0 3px rgba(155, 92, 255, 0.15);
+        }
+
+        .input-field::placeholder {
+            color: var(--color-fg-dim);
+        }
+
+        .btn-primary {
+            height: 40px;
+            padding: 0 1.5rem;
+            background: var(--gradient-primary);
+            color: white;
+            font-weight: 700;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(155, 92, 255, 0.25);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(155, 92, 255, 0.35);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        /* ===== ERROR BANNER ===== */
+        .error-banner {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.875rem 1.5rem;
+            background: linear-gradient(90deg, rgba(255, 93, 105, 0.15) 0%, rgba(255, 93, 105, 0.05) 100%);
+            border-left: 3px solid var(--color-accent-red);
+            color: #ffacb2;
+            font-size: 13px;
+            border-bottom: 1px solid var(--color-border);
+            animation: slideDown 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .error-banner button {
+            margin-left: auto;
+            background: transparent;
+            color: inherit;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .error-banner button:hover {
+            opacity: 1;
+        }
+
+        /* ===== ROOM HEADER ===== */
+        .room-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--color-border);
+            background: linear-gradient(180deg, #0f0f14 0%, transparent 100%);
+        }
+
+        .room-icon {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-lg);
+            background: linear-gradient(135deg, rgba(56, 217, 208, 0.2) 0%, rgba(56, 217, 208, 0.08) 100%);
+            color: var(--color-accent-cyan);
+            border: 1px solid rgba(56, 217, 208, 0.3);
+            flex-shrink: 0;
+        }
+
+        .room-info h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--color-fg);
+        }
+
+        .room-info .subtitle {
+            margin: 4px 0 0;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--color-fg-dim);
+        }
+
+        .room-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--color-fg-muted);
+        }
+
+        .status-badge {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--color-accent-green);
+        }
+
+        .status-badge.offline {
+            background: var(--color-fg-dim);
+        }
+
+        .viewer-count {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-left: auto;
+            padding: 0.5rem 1rem;
+            background: rgba(56, 217, 208, 0.08);
+            border: 1px solid rgba(56, 217, 208, 0.2);
+            border-radius: var(--radius-lg);
+            font-size: 12px;
+        }
+
+        .viewer-count strong {
+            color: var(--color-fg);
+            font-weight: 700;
+        }
+
+        .viewer-count svg {
+            color: var(--color-accent-cyan);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* ===== MESSAGES AREA ===== */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            scrollbar-width: thin;
+            scrollbar-color: #363640 transparent;
+        }
+
+        .messages-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .messages-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .messages-container::-webkit-scrollbar-thumb {
+            background: #363640;
+            border-radius: 4px;
+        }
+
+        .messages-container::-webkit-scrollbar-thumb:hover {
+            background: #464652;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 0.875rem;
+            margin-bottom: 0.75rem;
+            padding: 0.75rem 0;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .avatar {
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            font-weight: 700;
+            flex-shrink: 0;
+            border: 2px solid currentColor;
+        }
+
+        .avatar.violet { color: var(--color-accent-violet); background: rgba(155, 92, 255, 0.15); }
+        .avatar.cyan { color: var(--color-accent-cyan); background: rgba(56, 217, 208, 0.15); }
+        .avatar.gold { color: var(--color-accent-gold); background: rgba(232, 182, 53, 0.15); }
+        .avatar.green { color: var(--color-accent-green); background: rgba(99, 242, 140, 0.15); }
+        .avatar.blue { color: #5f9cff; background: rgba(95, 156, 255, 0.15); }
+        .avatar.red { color: var(--color-accent-red); background: rgba(255, 93, 105, 0.15); }
+
+        .message-content {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .username {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--color-fg);
+        }
+
+        .username.violet { color: var(--color-accent-violet); }
+        .username.cyan { color: var(--color-accent-cyan); }
+        .username.gold { color: var(--color-accent-gold); }
+        .username.green { color: var(--color-accent-green); }
+        .username.blue { color: #5f9cff; }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 8px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .badge.vip { background: var(--gradient-accent); color: #0a0a0d; }
+        .badge.reward { background: var(--gradient-warm); color: #0a0a0d; }
+        .badge.crown { color: var(--color-accent-gold); font-size: 13px; }
+
+        .timestamp {
+            font-size: 11px;
+            color: var(--color-fg-dim);
+            margin-left: auto;
+        }
+
+        .message-text {
+            font-size: 15px;
+            line-height: 1.5;
+            color: #e1dfe7;
+            word-break: break-word;
+        }
+
+        .system-message {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(90deg, rgba(56, 217, 208, 0.1) 0%, rgba(56, 217, 208, 0.05) 100%);
+            border-left: 2px solid var(--color-accent-cyan);
+            border-radius: var(--radius-md);
+            color: var(--color-fg-muted);
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* ===== COMPOSER ===== */
+        .composer-section {
+            padding: 1.25rem 1.5rem;
+            border-top: 1px solid var(--color-border);
+            background: linear-gradient(180deg, #0f0f14 0%, #0a0a0d 100%);
+        }
+
+        .composer-form {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: #0f0f14;
+            border: 1px solid #34343e;
+            border-radius: var(--radius-lg);
+            transition: all 0.2s ease;
+        }
+
+        .composer-form:focus-within {
+            border-color: var(--color-accent-violet);
+            box-shadow: 0 0 0 3px rgba(155, 92, 255, 0.12);
+        }
+
+        .composer-avatar {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: var(--gradient-primary);
+            color: white;
+            font-weight: 700;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .composer-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--color-fg);
+            font-size: 14px;
+            height: 32px;
+        }
+
+        .composer-input::placeholder {
+            color: var(--color-fg-dim);
+        }
+
+        .composer-input:focus {
+            outline: none;
+        }
+
+        .composer-action {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: var(--color-fg-muted);
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .composer-action:hover:not(:disabled) {
+            background: rgba(155, 92, 255, 0.1);
+            color: var(--color-accent-violet);
+        }
+
+        .send-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gradient-primary);
+            color: white;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(155, 92, 255, 0.3);
+        }
+
+        .send-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .composer-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0.75rem;
+            padding: 0 0.5rem;
+        }
+
+        .char-limit {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 11px;
+            color: var(--color-fg-dim);
+        }
+
+        .limit-ring {
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--color-accent-violet);
+            border-right-color: transparent;
+            border-radius: 50%;
+        }
+
+        .footer-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .settings-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: var(--color-fg-muted);
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .settings-btn:hover {
+            background: rgba(155, 92, 255, 0.1);
+            color: var(--color-accent-violet);
+        }
+
+        .btn-chat {
+            padding: 0.5rem 1rem;
+            background: var(--gradient-primary);
+            color: white;
+            font-weight: 700;
+            font-size: 13px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(155, 92, 255, 0.25);
+        }
+
+        .btn-chat:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(155, 92, 255, 0.35);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 640px) {
+            .controls-section {
+                flex-direction: column;
+            }
+
+            .input-group {
+                width: 100%;
+            }
+
+            .btn-primary {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .room-header {
+                flex-wrap: wrap;
+            }
+
+            .viewer-count {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 0.5rem;
+            }
+
+            .messages-container {
+                padding: 1rem;
+            }
+
+            .composer-section {
+                padding: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
-
-    <h2>🔴 Live Stream Chat</h2>
-    
-    <div class="controls">
-        <input type="text" id="stream-id" placeholder="Enter Stream ID (e.g., s5)" />
-        <button onclick="connectToStream()">Connect</button>
+    <div class="join-overlay" id="join-overlay" role="dialog" aria-modal="true" aria-labelledby="join-title">
+        <div class="join-card">
+            <div class="join-mark" aria-hidden="true">✦</div>
+            <h2 id="join-title">Join the live room</h2>
+            <p>Enter a valid stream ID and choose the name your community will see.</p>
+            <form class="join-form" onsubmit="joinRoom(event)">
+                <label>Stream ID
+                    <input id="stream-id" type="text" placeholder="e.g. s4" autocomplete="off" required>
+                </label>
+                <label>Display name
+                    <input id="sender-name" type="text" placeholder="Your name" autocomplete="nickname" required>
+                </label>
+                <div class="join-error" id="join-error" role="alert"></div>
+                <button class="join-submit" onclick="connectToStream()" id="connect-btn">
+                    📡 Join room
+                </button>
+            </form>
+        </div>
     </div>
+    <div class="container">
+        <!-- HEADER -->
+        <header class="header">
+            <div class="header-branding">
+                <div class="header-icon">✨</div>
+                <span>streamline</span>
+            </div>
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                LIVE CHAT
+            </div>
+            <div class="header-actions">
+                <button class="header-btn" aria-label="More options" title="More options">⋮</button>
+            </div>
+        </header>
 
-    <div id="chat-box">
-        <!-- Live messages will appear here -->
+        <!-- CONTROLS
+        <div class="controls-section">
+            <div class="input-group">
+                <label class="input-label">Stream room</label>
+                <input type="text" id="stream-id" class="input-field" placeholder="e.g. s4" value="s4" />
+            </div>
+            <div class="input-group">
+                <label class="input-label">Display name</label>
+                <input type="text" id="sender-name" class="input-field" placeholder="Your username" />
+            </div>
+            <button class="btn-primary" onclick="connectToStream()" id="connect-btn">
+                📡 Join room
+            </button>
+        </div> -->
+
+        <!-- ERROR BANNER -->
+        <div id="error-banner" class="error-banner" style="display: none;">
+            <span>⚠️</span>
+            <span id="error-text"></span>
+            <button onclick="clearError()" aria-label="Dismiss error">✕</button>
+        </div>
+
+        <!-- ROOM HEADER -->
+        <div class="room-header">
+            <div class="room-icon">💬</div>
+            <div class="room-info">
+                <div class="subtitle">Community Room</div>
+                <h1>Shared chat</h1>
+                <div class="room-status">
+                    <span class="status-badge offline" id="status-indicator"></span>
+                    <span id="status-text">Ready to join the live room</span>
+                </div>
+            </div>
+            <div class="viewer-count">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <strong id="viewer-number">1,500</strong>
+                <span>watching</span>
+            </div>
+        </div>
+
+        <!-- MESSAGES -->
+        <div class="messages-container" id="chat-box" aria-live="polite" aria-label="Chat messages">
+            <!-- Messages will appear here -->
+        </div>
+
+        <!-- COMPOSER -->
+        <div class="composer-section">
+            <form class="composer-form" onsubmit="sendMessage(event)">
+                <div class="composer-avatar" id="composer-avatar">?</div>
+                <input 
+                    type="text" 
+                    id="message-input" 
+                    class="composer-input" 
+                    placeholder="Join the room to chat" 
+                    disabled 
+                    aria-label="Message input"
+                />
+                <button type="button" class="composer-action" aria-label="Add emoji" disabled title="Add emoji">😊</button>
+                <button type="submit" class="send-btn" id="send-btn" disabled aria-label="Send message" title="Send message">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path>
+                    </svg>
+                </button>
+            </form>
+            <div class="composer-footer">
+                <div class="char-limit">
+                    <div class="limit-ring"></div>
+                    <span>1,500 characters</span>
+                </div>
+                <div class="footer-actions">
+                    <button class="settings-btn" type="button" aria-label="Chat settings" title="Chat settings">⚙️</button>
+                    <button class="btn-chat" onclick="document.getElementById('message-input')?.focus()" id="chat-menu-btn" disabled>
+                        Chat <span>▼</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         let stompClient = null;
+        let currentStreamId = null;
+
+        const colorNames = ['violet', 'cyan', 'gold', 'green', 'blue', 'red'];
+        const colorMap = {
+            'PogChamp': 'violet',
+            'StinkyCheese': 'cyan',
+            'PJSalt': 'red',
+            'CoolStoryBob': 'gold',
+            'FrankerZ': 'green',
+            'CoolCat': 'violet',
+            'NotLikeThis': 'blue'
+        };
+
+        function getColorForUser(username) {
+            if (colorMap[username]) return colorMap[username];
+            return colorNames[username.charCodeAt(0) % colorNames.length];
+        }
+
+        function showError(message) {
+            const banner = document.getElementById('error-banner');
+            const text = document.getElementById('error-text');
+            text.textContent = message;
+            banner.style.display = 'flex';
+        }
+
+        function clearError() {
+            document.getElementById('error-banner').style.display = 'none';
+        }
+
+        function updateComposerAvatar() {
+            const name = document.getElementById('sender-name').value.trim();
+            const avatar = document.getElementById('composer-avatar');
+            avatar.textContent = name ? name.slice(0, 1).toUpperCase() : '?';
+        }
+
+        function joinRoom(event) {
+            event.preventDefault();
+            const streamId = document.getElementById('join-stream-id').value.trim();
+            const senderName = document.getElementById('join-sender-name').value.trim();
+            const error = document.getElementById('join-error');
+            if (!streamId || !senderName) {
+                error.textContent = 'Enter both a stream ID and display name.';
+                return;
+            }
+            error.textContent = '';
+            document.getElementById('stream-id').value = streamId;
+            document.getElementById('sender-name').value = senderName;
+            connectToStream();
+        }
 
         function connectToStream() {
-            const streamId = document.getElementById('stream-id').value;
-            if (!streamId) {
-                alert("Please enter a Stream ID to connect!");
+            const streamId = document.getElementById('stream-id').value.trim();
+            const senderName = document.getElementById('sender-name').value.trim();
+
+            if (!streamId || !senderName) {
+                showError('Please enter both a stream ID and a display name.');
                 return;
             }
 
-            // 1. Establish the SockJS connection to your Spring Boot endpoint
-            const socket = new SockJS('http://localhost:7070/ws-chat');
-            stompClient = Stomp.over(socket);
+            clearError();
+            currentStreamId = streamId;
+            updateComposerAvatar();
 
-            // 2. Connect via STOMP
-            stompClient.connect({}, function (frame) {
-                console.log('Connected: ' + frame);
-                document.getElementById('chat-box').innerHTML += `<div class="chat-message"><em>🔌 Connected to stream room: ${streamId}</em></div>`;
-                
-                // 3. Subscribe to the specific topic routed by your Kafka Consumer
-                stompClient.subscribe('/topic/chat/' + streamId, function (messageOutput) {
-                    displayMessage(JSON.parse(messageOutput.body));
+            try {
+                const socket = new SockJS('http://localhost:7070/ws-chat');
+                stompClient = Stomp.over(socket);
+                stompClient.debug = null;
+
+                stompClient.connect({}, function() {
+                    document.getElementById('message-input').disabled = false;
+                    document.getElementById('send-btn').disabled = false;
+                    document.getElementById('chat-menu-btn').disabled = false;
+                    document.getElementById('connect-btn').textContent = '📡 Reconnect';
+                    document.getElementById('status-indicator').classList.remove('offline');
+                    document.getElementById('status-text').textContent = `Connected to room ${currentStreamId}`;
+                    document.getElementById('join-overlay').classList.add('is-hidden');
+
+                    displaySystemMessage(`Connected to stream room: ${currentStreamId}`);
+
+                    stompClient.subscribe('/topic/chat/' + currentStreamId, function(messageOutput) {
+                        displayMessage(JSON.parse(messageOutput.body));
+                    });
+                }, function() {
+                    showError('Could not connect to chat server. Ensure it\'s running on port 7070.');
+                    document.getElementById('status-indicator').classList.add('offline');
+                    document.getElementById('status-text').textContent = 'Connection failed';
                 });
-            });
+            } catch {
+                showError('Chat libraries unavailable. Add SockJS and STOMP before connecting.');
+            }
+        }
+
+        function displaySystemMessage(message) {
+            const chatBox = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.className = 'system-message';
+            div.innerHTML = `✓ ${message}`;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function displayMessage(message) {
             const chatBox = document.getElementById('chat-box');
-            chatBox.innerHTML += `
-                <div class="chat-message">
-                    <span class="sender">${message.sender}:</span> 
-                    <span class="content">${message.content}</span>
+            const color = getColorForUser(message.sender);
+            
+            const article = document.createElement('article');
+            article.className = 'chat-message';
+
+            let badgeHTML = '';
+            if (message.badge === 'vip') badgeHTML = '<span class="badge vip">VIP</span>';
+            else if (message.badge === 'reward') badgeHTML = '<span class="badge reward">REWARD</span>';
+            else if (message.badge === 'crown') badgeHTML = '<span class="badge crown">👑</span>';
+
+            article.innerHTML = `
+                <div class="avatar ${color}">${message.sender.slice(0, 1).toUpperCase()}</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="username ${color}">${message.sender}</span>
+                        ${badgeHTML}
+                        <span class="timestamp">now</span>
+                    </div>
+                    <p class="message-text">${message.content}</p>
                 </div>
             `;
-            // Auto-scroll to the bottom
+
+            chatBox.appendChild(article);
             chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function sendMessage(event) {
+            event.preventDefault();
+
+            const content = document.getElementById('message-input').value.trim();
+            const sender = document.getElementById('sender-name').value.trim();
+
+            if (!content || !currentStreamId) return;
+
+            const chatMessage = {
+                streamId: currentStreamId,
+                sender: sender,
+                content: content
+            };
+
+            fetch('http://localhost:7070/api/chat/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(chatMessage)
+            }).then(() => {
+                document.getElementById('message-input').value = '';
+                updateComposerAvatar();
+            }).catch(() => {
+                showError('Message could not be sent. Check the chat server.');
+            });
+        }
+
+        document.getElementById('sender-name').addEventListener('input', updateComposerAvatar);
+        document.getElementById('message-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+                sendMessage(e);
+            }
+        });
+
+        document.getElementById('message-input').addEventListener('input', () => {
+            const hasText = document.getElementById('message-input').value.trim().length > 0;
+            document.getElementById('send-btn').disabled = !currentStreamId || !hasText;
+        });
+
+        // Load external scripts
+        if (typeof window !== 'undefined') {
+            const scripts = [
+                ['SockJS', 'https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js'],
+                ['Stomp', 'https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js'],
+            ];
+            scripts.forEach(([id, src]) => {
+                if (!document.getElementById(id)) {
+                    const script = document.createElement('script');
+                    script.id = id;
+                    script.src = src;
+                    script.async = true;
+                    document.head.appendChild(script);
+                }
+            });
         }
     </script>
 </body>
